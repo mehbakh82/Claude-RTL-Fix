@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Generate Claude RTL Fix Icons</title>
+  <style>
+    body { font-family: sans-serif; padding: 2rem; background: #f5f5f5; }
+    .previews { display: flex; gap: 2rem; align-items: flex-end; margin: 1.5rem 0; }
+    canvas { border: 1px solid #ccc; border-radius: 4px; background: white; }
+    a { display: inline-block; margin: 0.25rem 0.5rem; padding: 0.5rem 1rem;
+        background: #4A90D9; color: white; border-radius: 4px; text-decoration: none; font-size: 0.9rem; }
+    a:hover { background: #357abd; }
+    .instructions { background: #fff3cd; border-left: 4px solid #ffc107; padding: 1rem; margin: 1rem 0; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <h2>Icon Generator — Claude RTL Fix Extension</h2>
+  <div class="instructions">
+    <strong>Instructions:</strong> Open this file in any browser, then click each download link.
+    Save the files into the <code>icons/</code> folder next to this file.
+  </div>
+
+  <div class="previews" id="previews"></div>
+  <div id="links"></div>
+
+  <script>
+    const SIZES = [16, 48, 128];
+
+    function makeIcon(size) {
+      const canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext('2d');
+
+      // Rounded-rectangle background
+      const r = size * 0.18;
+      ctx.beginPath();
+      ctx.moveTo(r, 0);
+      ctx.lineTo(size - r, 0);
+      ctx.quadraticCurveTo(size, 0, size, r);
+      ctx.lineTo(size, size - r);
+      ctx.quadraticCurveTo(size, size, size - r, size);
+      ctx.lineTo(r, size);
+      ctx.quadraticCurveTo(0, size, 0, size - r);
+      ctx.lineTo(0, r);
+      ctx.quadraticCurveTo(0, 0, r, 0);
+      ctx.closePath();
+
+      // Gradient fill
+      const grad = ctx.createLinearGradient(0, 0, size, size);
+      grad.addColorStop(0, '#5B73E8');
+      grad.addColorStop(1, '#2C52D8');
+      ctx.fillStyle = grad;
+      ctx.fill();
+
+      // "ر" — a Persian letter (ر = reh) as the logo glyph
+      ctx.fillStyle = 'rgba(255,255,255,0.95)';
+      ctx.font = `bold ${Math.round(size * 0.52)}px serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('ر', size * 0.52, size * 0.54);
+
+      // Small RTL arrows hint at the bottom-right for larger sizes
+      if (size >= 48) {
+        ctx.fillStyle = 'rgba(255,255,255,0.5)';
+        ctx.font = `${Math.round(size * 0.18)}px sans-serif`;
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText('←', size - size * 0.06, size - size * 0.04);
+      }
+
+      return canvas;
+    }
+
+    const previews = document.getElementById('previews');
+    const links = document.getElementById('links');
+
+    SIZES.forEach(size => {
+      const canvas = makeIcon(size);
+      canvas.title = `${size}×${size}`;
+
+      const wrapper = document.createElement('div');
+      wrapper.style.textAlign = 'center';
+      wrapper.appendChild(canvas);
+      const label = document.createElement('div');
+      label.style.marginTop = '4px';
+      label.style.fontSize = '0.8rem';
+      label.style.color = '#555';
+      label.textContent = `${size}×${size}`;
+      wrapper.appendChild(label);
+      previews.appendChild(wrapper);
+
+      const a = document.createElement('a');
+      a.href = canvas.toDataURL('image/png');
+      a.download = `icon${size}.png`;
+      a.textContent = `⬇ Download icon${size}.png`;
+      links.appendChild(a);
+    });
+  </script>
+</body>
+</html>

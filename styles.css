@@ -1,0 +1,46 @@
+/* ============================================================
+   Claude RTL Fix — injected stylesheet
+   Only targets elements the content script has marked.
+   ============================================================ */
+
+/* Main RTL block elements */
+[data-rtl-fix] {
+  direction: rtl !important;
+  text-align: right !important;
+  unicode-bidi: embed;
+}
+
+/* RTL-marked lists (ul/ol whose majority of items are RTL) */
+[data-rtl-fix-list] {
+  direction: rtl !important;
+  text-align: right !important;
+}
+
+/* ── Code must always stay LTR ─────────────────────────────── */
+
+/* Code blocks nested inside an RTL paragraph */
+[data-rtl-fix] pre,
+[data-rtl-fix] code {
+  direction: ltr !important;
+  text-align: left !important;
+  unicode-bidi: isolate;
+  display: block; /* pre is already block; force code inline → block so the rule applies cleanly */
+}
+
+/* Inline code (still inside RTL parent — keep it isolated) */
+[data-rtl-fix] code {
+  display: inline-block;
+  unicode-bidi: isolate;
+}
+
+/* ── Inline elements inside RTL blocks ─────────────────────── */
+
+/* Links, bold, italic, etc. inherit direction correctly via unicode-bidi:embed.
+   No extra rule needed — the browser's BiDi algorithm handles mixed text. */
+
+/* ── Table cells ────────────────────────────────────────────── */
+
+[data-rtl-fix].td,
+[data-rtl-fix].th {
+  text-align: right !important;
+}
