@@ -27,8 +27,10 @@
     '[role="menubar"], [role="toolbar"], [role="dialog"]';
 
   // Attributes we stamp on elements we own, so we can undo our changes later.
-  const RTL_MARKER  = 'data-rtl-fix';
-  const LIST_MARKER = 'data-rtl-fix-list';
+  const RTL_MARKER  = 'data-rtl-fix';      // element is RTL (we set dir="rtl")
+  const LIST_MARKER = 'data-rtl-fix-list'; // list container is RTL (majority RTL items)
+  const LTR_MARKER  = 'data-rtl-fix-ltr';  // LTR item inside an RTL list (we set dir="ltr"
+                                            // explicitly so it overrides the parent dir="rtl")
 
   // ---------------------------------------------------------------------------
   // Helpers
@@ -49,7 +51,7 @@
       ''
     );
     if (!significant.length) return 0;
-    // Reset lastIndex before each use because RTL_REGEX is a shared /g instance.
+    // Reset lastIndex before each use: RTL_REGEX is a shared /g instance.
     RTL_REGEX.lastIndex = 0;
     const hits = (significant.match(RTL_REGEX) || []).length;
     return hits / significant.length;
@@ -67,25 +69,52 @@
     if (ratio >= RTL_THRESHOLD) {
       if (el.getAttribute('dir') !== 'rtl') el.setAttribute('dir', 'rtl');
       if (!el.hasAttribute(RTL_MARKER))     el.setAttribute(RTL_MARKER, '');
+      // If this element was previously marked as an LTR override inside an RTL
+      // list, that's now stale — it became RTL, so drop the LTR override.
+      if (el.hasAttribute(LTR_MARKER))      el.removeAttribute(LTR_MARKER);
     } else if (el.hasAttribute(RTL_MARKER)) {
       el.removeAttribute('dir');
       el.removeAttribute(RTL_MARKER);
+      // Note: if this element is still inside an RTL list, reconcileList will
+      // re-add dir="ltr" + LTR_MARKER on the next reconcile pass.
     }
   }
 
   // Reconciles ONE list: aligns <ul>/<ol> dir to match the majority of its
-  // direct <li> children. Called once per list, not via querySelectorAll.
+  // direct <li> children. If the list becomes RTL, explicitly anchors any
+  // LTR children with dir="ltr" so they don't inherit the parent direction.
   function reconcileList(list) {
     if (list.closest(SKIP_ANCESTOR_SEL)) return;
     const items    = [...list.querySelectorAll(':scope > li')];
     if (!items.length) return;
     const rtlCount = items.filter((li) => li.hasAttribute(RTL_MARKER)).length;
+
     if (rtlCount / items.length > 0.5) {
       list.setAttribute('dir', 'rtl');
       list.setAttribute(LIST_MARKER, '');
-    } else if (list.hasAttribute(LIST_MARKER)) {
-      list.removeAttribute('dir');
-      list.removeAttribute(LIST_MARKER);
+
+      // Minority LTR items must be explicitly anchored to dir="ltr";
+      // otherwise they inherit dir="rtl" from the parent and become unreadable.
+      items.forEach((li) => {
+        if (!li.hasAttribute(RTL_MARKER) && !li.hasAttribute(LTR_MARKER)
+            && !li.getAttribute('dir')) {
+          li.setAttribute('dir', 'ltr');
+          li.setAttribute(LTR_MARKER, '');
+        }
+      });
+    } else {
+      if (list.hasAttribute(LIST_MARKER)) {
+        list.removeAttribute('dir');
+        list.removeAttribute(LIST_MARKER);
+      }
+      // Remove LTR anchors we added — the parent is now LTR so they're no
+      // longer fighting an inherited dir="rtl".
+      items.forEach((li) => {
+        if (li.hasAttribute(LTR_MARKER)) {
+          li.removeAttribute('dir');
+          li.removeAttribute(LTR_MARKER);
+        }
+      });
     }
   }
 
@@ -121,9 +150,8 @@
   // MutationObserver — handles SPA navigation and streamed responses
   // ---------------------------------------------------------------------------
 
-  // One timer per streaming text-node ancestry walk. We keep a Set of pending
-  // targets so that when multiple paragraphs stream concurrently (unlikely but
-  // possible) we re-evaluate each one, not just the last.
+  // Accumulate all characterData targets during the debounce window so that
+  // multiple simultaneously-streaming paragraphs are all re-evaluated.
   const pendingCharData = new Set();
   let charDataTimer = null;
 

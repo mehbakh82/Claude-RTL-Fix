@@ -1,7 +1,7 @@
 /* ============================================================
    Claude RTL Fix — injected stylesheet
    Only targets elements the content script has marked with
-   data-rtl-fix or data-rtl-fix-list attributes.
+   data-rtl-fix, data-rtl-fix-list, or data-rtl-fix-ltr.
    ============================================================ */
 
 /* ── RTL block elements (p, h1–h6, li, blockquote, td, th, …) ── */
@@ -12,11 +12,22 @@
   unicode-bidi: embed;
 }
 
-/* ── RTL list containers (ul / ol whose majority of li are RTL) ── */
+/* ── RTL list containers (ul/ol whose majority of li are RTL) ── */
 
 [data-rtl-fix-list] {
   direction: rtl !important;
   text-align: right !important;
+  unicode-bidi: embed;
+}
+
+/* ── LTR minority items inside an RTL list ──────────────────── */
+/* The script sets dir="ltr" + data-rtl-fix-ltr on these items so
+   they override the parent list's dir="rtl". The CSS here locks in
+   the correct alignment so !important from the parent can't cascade. */
+
+[data-rtl-fix-ltr] {
+  direction: ltr !important;
+  text-align: left !important;
   unicode-bidi: embed;
 }
 
@@ -37,11 +48,4 @@
   text-align: left !important;
   unicode-bidi: isolate;
   display: inline-block;
-}
-
-/* ── Table cells marked directly by the script ──────────────── */
-
-td[data-rtl-fix],
-th[data-rtl-fix] {
-  text-align: right !important;
 }
