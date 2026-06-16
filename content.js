@@ -1,13 +1,13 @@
 (function () {
   'use strict';
 
-  // Persian / Arabic Unicode ranges (escape sequences, encoding-safe):
-  //   U+0600-06FF  Arabic block — Farsi/Persian alphabet lives here
+  // Persian / Arabic Unicode ranges — u flag enables full Unicode mode:
+  //   U+0600-06FF  Arabic block (Farsi/Persian alphabet lives here)
   //   U+0750-077F  Arabic Supplement
   //   U+08A0-08FF  Arabic Extended-A
   //   U+FB50-FDFF  Arabic Presentation Forms-A
   //   U+FE70-FEFF  Arabic Presentation Forms-B
-  const RTL_REGEX = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/g;
+  const RTL_REGEX = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/gu;
 
   // Fraction of "significant" (non-whitespace, non-digit, non-ASCII-punct)
   // characters that must be RTL before we flip a block. 0.15 handles
@@ -15,17 +15,18 @@
   // without creating false-positives on English-only paragraphs.
   const RTL_THRESHOLD = 0.15;
 
-  // Block-level elements we inspect and potentially flip
-  const BLOCK_SEL = 'p, h1, h2, h3, h4, h5, h6, li, blockquote, dt, dd';
+  // Block-level elements we inspect and potentially flip.
+  // td/th included so Markdown tables with Persian content render RTL.
+  const BLOCK_SEL = 'p, h1, h2, h3, h4, h5, h6, li, blockquote, dt, dd, td, th';
 
-  // Ancestor elements whose subtrees we must never touch:
-  // code blocks, form inputs, navigation, dialogs
+  // Ancestor elements whose subtrees we must never flip:
+  // code blocks, form inputs, navigation chrome, dialogs.
   const SKIP_ANCESTOR_SEL =
     'pre, code, [contenteditable="true"], textarea, input, ' +
     'nav, header, footer, aside, [role="navigation"], ' +
     '[role="menubar"], [role="toolbar"], [role="dialog"]';
 
-  // Attributes we stamp on elements we own, so we can remove our changes later
+  // Attributes we stamp on elements we own, so we can undo our changes later.
   const RTL_MARKER  = 'data-rtl-fix';
   const LIST_MARKER = 'data-rtl-fix-list';
 
@@ -33,26 +34,23 @@
   // Helpers
   // ---------------------------------------------------------------------------
 
-  /**
-   * Returns the text content of `el` with all <pre>/<code> descendants
-   * stripped, so code tokens don't skew the RTL character ratio.
-   */
+  // Returns text of `el` with all <pre>/<code> descendants stripped,
+  // so code tokens don't skew the RTL character ratio.
   function textWithoutCode(el) {
     const clone = el.cloneNode(true);
     clone.querySelectorAll('pre, code').forEach((n) => n.remove());
     return clone.textContent || '';
   }
 
-  /**
-   * Fraction of "significant" characters (not whitespace, digits, or common
-   * ASCII punctuation/symbols) that fall in an RTL Unicode range.
-   */
+  // Fraction of "significant" characters that are RTL script.
   function rtlRatio(text) {
     const significant = text.replace(
       /[\s\d!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]/g,
       ''
     );
     if (!significant.length) return 0;
+    // Reset lastIndex before each use because RTL_REGEX is a shared /g instance.
+    RTL_REGEX.lastIndex = 0;
     const hits = (significant.match(RTL_REGEX) || []).length;
     return hits / significant.length;
   }
@@ -75,40 +73,76 @@
     }
   }
 
-  /**
-   * After processing <li> elements, align the parent <ul>/<ol> to match the
-   * majority of its children so that bullet/number markers land on the right.
-   */
-  function reconcileLists(root) {
-    const lists = root.querySelectorAll ? root.querySelectorAll('ul, ol') : [];
-    lists.forEach((list) => {
-      if (list.closest(SKIP_ANCESTOR_SEL)) return;
-      const items    = [...list.querySelectorAll(':scope > li')];
-      if (!items.length) return;
-      const rtlCount = items.filter((li) => li.hasAttribute(RTL_MARKER)).length;
-      if (rtlCount / items.length > 0.5) {
-        list.setAttribute('dir', 'rtl');
-        list.setAttribute(LIST_MARKER, '');
-      } else if (list.hasAttribute(LIST_MARKER)) {
-        list.removeAttribute('dir');
-        list.removeAttribute(LIST_MARKER);
-      }
-    });
+  // Reconciles ONE list: aligns <ul>/<ol> dir to match the majority of its
+  // direct <li> children. Called once per list, not via querySelectorAll.
+  function reconcileList(list) {
+    if (list.closest(SKIP_ANCESTOR_SEL)) return;
+    const items    = [...list.querySelectorAll(':scope > li')];
+    if (!items.length) return;
+    const rtlCount = items.filter((li) => li.hasAttribute(RTL_MARKER)).length;
+    if (rtlCount / items.length > 0.5) {
+      list.setAttribute('dir', 'rtl');
+      list.setAttribute(LIST_MARKER, '');
+    } else if (list.hasAttribute(LIST_MARKER)) {
+      list.removeAttribute('dir');
+      list.removeAttribute(LIST_MARKER);
+    }
   }
+
+  // Reconciles all lists within `root`, plus `root` itself if it is a list.
+  function reconcileLists(root) {
+    if (root.matches?.('ul, ol')) reconcileList(root);
+    root.querySelectorAll?.('ul, ol').forEach(reconcileList);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Subtree processor — called for initial scan and every added node
+  // ---------------------------------------------------------------------------
 
   function processSubtree(root) {
-    if (root.matches && root.matches(BLOCK_SEL)) applyRTL(root);
-    if (root.querySelectorAll) {
-      root.querySelectorAll(BLOCK_SEL).forEach(applyRTL);
-    }
+    // If root itself is a target block, process it.
+    if (root.matches?.(BLOCK_SEL)) applyRTL(root);
+
+    // Process all descendant blocks.
+    root.querySelectorAll?.(BLOCK_SEL).forEach(applyRTL);
+
+    // Reconcile all lists in this subtree (including root if it is a list).
     reconcileLists(root);
+
+    // If root is a <li>, its parent <ul>/<ol> was not reached by reconcileLists
+    // above (querySelectorAll only descends, never ascends). Reconcile it now.
+    if (root.tagName === 'LI') {
+      const parent = root.parentElement;
+      if (parent?.matches?.('ul, ol')) reconcileList(parent);
+    }
   }
 
   // ---------------------------------------------------------------------------
-  // MutationObserver — SPA navigation + live-streamed responses
+  // MutationObserver — handles SPA navigation and streamed responses
   // ---------------------------------------------------------------------------
 
+  // One timer per streaming text-node ancestry walk. We keep a Set of pending
+  // targets so that when multiple paragraphs stream concurrently (unlikely but
+  // possible) we re-evaluate each one, not just the last.
+  const pendingCharData = new Set();
   let charDataTimer = null;
+
+  function flushCharData() {
+    for (const target of pendingCharData) {
+      let el = target.parentElement;
+      while (el && el !== document.body) {
+        if (el.matches?.(BLOCK_SEL)) {
+          applyRTL(el);
+          // Reconcile the nearest ancestor list if this block is a list item.
+          const list = el.closest('ul, ol');
+          if (list) reconcileList(list);
+          break;
+        }
+        el = el.parentElement;
+      }
+    }
+    pendingCharData.clear();
+  }
 
   const observer = new MutationObserver((mutations) => {
     for (const mut of mutations) {
@@ -118,22 +152,9 @@
           processSubtree(node);
         }
       } else if (mut.type === 'characterData') {
-        // Walk up from the changed text node to the nearest block ancestor,
-        // then re-evaluate. Debounced because streaming fires rapidly.
-        const target = mut.target;
+        pendingCharData.add(mut.target);
         clearTimeout(charDataTimer);
-        charDataTimer = setTimeout(() => {
-          let el = target.parentElement;
-          while (el && el !== document.body) {
-            if (el.matches && el.matches(BLOCK_SEL)) {
-              applyRTL(el);
-              const list = el.closest('ul, ol');
-              if (list) reconcileLists(list.parentElement || list);
-              break;
-            }
-            el = el.parentElement;
-          }
-        }, 80);
+        charDataTimer = setTimeout(flushCharData, 80);
       }
     }
   });
@@ -144,6 +165,6 @@
     characterData: true,
   });
 
-  // Initial pass over whatever is already rendered
+  // Initial pass over whatever is already in the DOM.
   processSubtree(document.body);
 })();

@@ -1,46 +1,47 @@
 /* ============================================================
    Claude RTL Fix — injected stylesheet
-   Only targets elements the content script has marked.
+   Only targets elements the content script has marked with
+   data-rtl-fix or data-rtl-fix-list attributes.
    ============================================================ */
 
-/* Main RTL block elements */
+/* ── RTL block elements (p, h1–h6, li, blockquote, td, th, …) ── */
+
 [data-rtl-fix] {
   direction: rtl !important;
   text-align: right !important;
   unicode-bidi: embed;
 }
 
-/* RTL-marked lists (ul/ol whose majority of items are RTL) */
+/* ── RTL list containers (ul / ol whose majority of li are RTL) ── */
+
 [data-rtl-fix-list] {
   direction: rtl !important;
   text-align: right !important;
+  unicode-bidi: embed;
 }
 
-/* ── Code must always stay LTR ─────────────────────────────── */
+/* ── Code must always remain LTR ──────────────────────────────── */
 
-/* Code blocks nested inside an RTL paragraph */
-[data-rtl-fix] pre,
+/* Block code (pre > code, or standalone pre) inside an RTL paragraph */
+[data-rtl-fix] pre {
+  direction: ltr !important;
+  text-align: left !important;
+  unicode-bidi: isolate;
+}
+
+/* Inline code (backtick spans) inside an RTL paragraph.
+   display:inline-block creates a new formatting context so
+   direction:ltr takes effect without breaking the flow. */
 [data-rtl-fix] code {
   direction: ltr !important;
   text-align: left !important;
   unicode-bidi: isolate;
-  display: block; /* pre is already block; force code inline → block so the rule applies cleanly */
-}
-
-/* Inline code (still inside RTL parent — keep it isolated) */
-[data-rtl-fix] code {
   display: inline-block;
-  unicode-bidi: isolate;
 }
 
-/* ── Inline elements inside RTL blocks ─────────────────────── */
+/* ── Table cells marked directly by the script ──────────────── */
 
-/* Links, bold, italic, etc. inherit direction correctly via unicode-bidi:embed.
-   No extra rule needed — the browser's BiDi algorithm handles mixed text. */
-
-/* ── Table cells ────────────────────────────────────────────── */
-
-[data-rtl-fix].td,
-[data-rtl-fix].th {
+td[data-rtl-fix],
+th[data-rtl-fix] {
   text-align: right !important;
 }
