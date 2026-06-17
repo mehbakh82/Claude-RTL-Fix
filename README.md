@@ -14,7 +14,22 @@ Claude's web client does not detect RTL languages and renders everything left-to
 - Code blocks (`<pre>`, `<code>`) always remain left-to-right
 - Markdown tables with Persian cell content are aligned correctly
 - Works on dynamically rendered content and live-streamed responses via `MutationObserver`
-- Zero external dependencies, no network requests
+- A toolbar popup to turn the extension on/off and switch fonts, with no page reload required
+- Optional **Vazirmatn** font for Persian text, for cleaner, more legible output
+- Zero tracking, zero analytics, no network requests at runtime
+
+---
+
+## The popup
+
+Click the extension icon in your browser toolbar to open the popup:
+
+- **Enable RTL Fix** — master on/off switch. Turning it off immediately undoes every change the extension made to the current page (no reload needed); turning it back on reprocesses the page right away.
+- **Use Vazirmatn font** — swaps Persian text to [Vazirmatn](https://github.com/rastikerdar/vazirmatn), a modern, highly legible Persian typeface, while leaving English/code text in whatever font Claude.ai normally uses. This works even inside a single code-switched sentence, because the font is scoped by Unicode range, not by element.
+- **Re-scan this page** — manually forces the extension to re-evaluate the current page. Useful as a fallback if you suspect something wasn't picked up automatically.
+- A status line tells you whether the extension is active on the current tab.
+
+Both toggles take effect instantly on every open Claude.ai tab — no refresh required.
 
 ---
 
@@ -22,12 +37,14 @@ Claude's web client does not detect RTL languages and renders everything left-to
 
 | Browser | Support |
 | ------- | ------- |
-| Chrome 88+ | ✅ Native (Manifest V3) |
-| Microsoft Edge 88+ | ✅ Native |
-| Opera 74+ | ✅ Native |
+| Chrome 99+ | ✅ Native (Manifest V3) |
+| Microsoft Edge 99+ | ✅ Native |
+| Opera 85+ | ✅ Native |
 | Brave | ✅ Native |
 | Firefox 101+ | ✅ Native (MV3) |
 | Safari 15.4+ | ✅ Works — requires a one-time Xcode build (see below) |
+
+(Minimum versions reflect `chrome.storage`'s promise-based API, used to persist your popup settings. Practically any browser auto-updated since 2022 qualifies.)
 
 ---
 
@@ -40,6 +57,7 @@ Claude's web client does not detect RTL languages and renders everything left-to
 3. Click **Load unpacked**
 4. Select this folder (`Claude RTL Fix/`)
 5. Visit [claude.ai](https://claude.ai) — Persian responses are now RTL ✓
+6. Optional: click the toolbar icon to open the popup and enable the Vazirmatn font
 
 ### Firefox
 
@@ -81,7 +99,7 @@ This generates a full Xcode project on your Desktop.
 2. Check the box next to **ClaudeRTLFix**
 3. Click **Always Allow on claude.ai** when prompted
 
-The extension is now permanently installed. You don't need to rebuild or run the wrapper app again unless you update the extension's source files.
+The extension is now permanently installed. You don't need to rebuild or run the wrapper app again unless you update the extension's source files. The popup, toggles, and Vazirmatn font all work identically once converted, since Safari Web Extensions support the same `browser.storage` and `@font-face` APIs.
 
 **Rebuilding after updates:** If you pull new changes from this repo, repeat Steps 1–3. The Xcode project and app will be overwritten.
 
@@ -99,6 +117,12 @@ The extension is now permanently installed. You don't need to rebuild or run the
 
 The 15% threshold is intentionally low to catch paragraphs that open in Persian and switch to English mid-sentence.
 
+Settings (enabled / Vazirmatn font) are stored in `chrome.storage.local`, shared across every open Claude.ai tab. The popup writes to storage; the content script listens via `storage.onChanged` and applies changes immediately, without a page reload.
+
+### The Vazirmatn font toggle
+
+The bundled `@font-face` rule restricts itself to a `unicode-range` covering only Persian/Arabic glyphs (the same range the detector uses). This means setting `font-family: Vazirmatn, ...` on a code-switched paragraph only affects the Persian characters — English words, numbers, and inline code in the same sentence keep rendering in Claude's normal font, automatically, with no per-character markup needed.
+
 ---
 
 ## Files
@@ -106,8 +130,15 @@ The 15% threshold is intentionally low to catch paragraphs that open in Persian 
 ```text
 Claude RTL Fix/
 ├── manifest.json         # WebExtension Manifest V3
-├── content.js            # RTL detection + MutationObserver logic
-├── styles.css            # direction/text-align overrides
+├── content.js            # RTL detection, settings sync, MutationObserver logic
+├── styles.css            # direction/text-align overrides + Vazirmatn @font-face
+├── popup.html             # Toolbar popup UI
+├── popup.css              # Popup styling (light/dark mode aware)
+├── popup.js               # Popup logic: settings, tab status, re-scan
+├── fonts/
+│   ├── Vazirmatn-Regular.woff2  # Persian/Arabic glyph subset only (~21 KB)
+│   ├── Vazirmatn-Bold.woff2     # Persian/Arabic glyph subset only (~21 KB)
+│   └── OFL.txt                  # Vazirmatn's SIL Open Font License
 ├── icons/
 │   ├── create-icons.html # Open in browser to regenerate icon PNGs
 │   ├── icon16.png
@@ -119,12 +150,13 @@ Claude RTL Fix/
 
 ---
 
-## Contributing
+## Licensing
 
-Pull requests welcome. If Claude.ai updates its DOM structure and the extension stops working, please open an issue with a screenshot and the selector path to the message container.
+- Extension code: MIT — see [LICENSE](LICENSE)
+- Bundled font: [Vazirmatn](https://github.com/rastikerdar/vazirmatn) by Saber Rastikerdar, SIL Open Font License 1.1 — see [fonts/OFL.txt](fonts/OFL.txt)
 
 ---
 
-## License
+## Contributing
 
-MIT — see [LICENSE](LICENSE)
+Pull requests welcome. If Claude.ai updates its DOM structure and the extension stops working, please open an issue with a screenshot and the selector path to the message container.

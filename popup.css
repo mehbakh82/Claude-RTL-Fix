@@ -1,0 +1,237 @@
+@font-face {
+  font-family: 'Vazirmatn';
+  src: url('fonts/Vazirmatn-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0600-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0897-08E1,
+    U+08E3-08FF, U+200C-200E, U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74,
+    U+FE76-FEFC;
+}
+
+:root {
+  --bg: #ffffff;
+  --fg: #1a1a2e;
+  --muted: #6b6b80;
+  --border: #e8e8f0;
+  --accent: #4A55D0;
+  --accent-light: #606FF0;
+  --success: #2fb35e;
+  --row-hover: #f5f5fb;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1c1c28;
+    --fg: #f0f0f5;
+    --muted: #9999ad;
+    --border: #2e2e3e;
+    --accent: #7c87e8;
+    --accent-light: #8a93f0;
+    --success: #4fd07e;
+    --row-hover: #25253a;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  width: 300px;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 13px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 16px 12px;
+}
+
+.logo {
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  flex-shrink: 0;
+}
+
+.title-block h1 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+}
+
+.subtitle {
+  margin: 1px 0 0;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 16px 14px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--row-hover);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--muted);
+  flex-shrink: 0;
+  transition: background 0.2s;
+}
+
+.status-dot.active { background: var(--success); }
+.status-dot.inactive { background: #d9534f; }
+
+.controls {
+  padding: 0 16px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border);
+}
+
+.row:last-of-type { border-bottom: none; }
+
+.row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.row-label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.row-sub {
+  font-size: 11px;
+  color: var(--muted);
+  font-family: 'Vazirmatn', Tahoma, sans-serif;
+  direction: rtl;
+  text-align: right;
+}
+
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 38px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  inset: 0;
+  background: var(--border);
+  border-radius: 22px;
+  transition: background 0.2s;
+}
+
+.slider::before {
+  content: "";
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  left: 3px;
+  top: 3px;
+  background: white;
+  border-radius: 50%;
+  transition: transform 0.2s;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.25);
+}
+
+.switch input:checked + .slider {
+  background: var(--accent);
+}
+
+.switch input:checked + .slider::before {
+  transform: translateX(16px);
+}
+
+.switch input:disabled + .slider {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.rescan-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  width: 100%;
+  margin-top: 12px;
+  padding: 8px 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--fg);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.rescan-btn:hover {
+  background: var(--row-hover);
+  border-color: var(--accent-light);
+}
+
+.rescan-btn:active { transform: scale(0.98); }
+
+.rescan-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.rescan-hint {
+  margin: 6px 0 4px;
+  font-size: 11px;
+  color: var(--muted);
+  text-align: center;
+  min-height: 14px;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px 14px;
+  margin-top: 4px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.footer a {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.footer a:hover { text-decoration: underline; }

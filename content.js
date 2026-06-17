@@ -1,6 +1,8 @@
 (function () {
   'use strict';
 
+  const api = typeof browser !== 'undefined' ? browser : chrome;
+
   // Persian / Arabic Unicode ranges — u flag enables full Unicode mode:
   //   U+0600-06FF  Arabic block (Farsi/Persian alphabet lives here)
   //   U+0750-077F  Arabic Supplement
@@ -31,6 +33,23 @@
   const LIST_MARKER = 'data-rtl-fix-list'; // list container is RTL (majority RTL items)
   const LTR_MARKER  = 'data-rtl-fix-ltr';  // LTR item inside an RTL list (we set dir="ltr"
                                             // explicitly so it overrides the parent dir="rtl")
+
+  // Class toggled on <html> to opt in to the bundled Vazirmatn font for RTL text.
+  const VAZIR_CLASS = 'claude-rtl-vazir';
+
+  // ---------------------------------------------------------------------------
+  // Settings
+  // ---------------------------------------------------------------------------
+
+  const settings = { enabled: true, vazirFont: false };
+
+  function storageGet(keys) {
+    try {
+      const ret = api.storage.local.get(keys);
+      if (ret && typeof ret.then === 'function') return ret;
+    } catch (e) { /* fall through */ }
+    return new Promise((resolve) => api.storage.local.get(keys, resolve));
+  }
 
   // ---------------------------------------------------------------------------
   // Helpers
@@ -172,27 +191,113 @@
     pendingCharData.clear();
   }
 
-  const observer = new MutationObserver((mutations) => {
-    for (const mut of mutations) {
-      if (mut.type === 'childList') {
-        for (const node of mut.addedNodes) {
-          if (node.nodeType !== Node.ELEMENT_NODE) continue;
-          processSubtree(node);
+  let observer = null;
+
+  function startObserving() {
+    if (observer) return;
+    observer = new MutationObserver((mutations) => {
+      for (const mut of mutations) {
+        if (mut.type === 'childList') {
+          for (const node of mut.addedNodes) {
+            if (node.nodeType !== Node.ELEMENT_NODE) continue;
+            processSubtree(node);
+          }
+        } else if (mut.type === 'characterData') {
+          pendingCharData.add(mut.target);
+          clearTimeout(charDataTimer);
+          charDataTimer = setTimeout(flushCharData, 80);
         }
-      } else if (mut.type === 'characterData') {
-        pendingCharData.add(mut.target);
-        clearTimeout(charDataTimer);
-        charDataTimer = setTimeout(flushCharData, 80);
+      }
+    });
+    observer.observe(document.body, {
+      childList:     true,
+      subtree:       true,
+      characterData: true,
+    });
+  }
+
+  function stopObserving() {
+    if (observer) {
+      observer.disconnect();
+      observer = null;
+    }
+    clearTimeout(charDataTimer);
+    pendingCharData.clear();
+  }
+
+  // Undo every change we've made to the page (used when the user disables
+  // the extension from the popup, without needing a page reload).
+  function teardown() {
+    stopObserving();
+    document.querySelectorAll(`[${RTL_MARKER}], [${LIST_MARKER}], [${LTR_MARKER}]`)
+      .forEach((el) => {
+        el.removeAttribute('dir');
+        el.removeAttribute(RTL_MARKER);
+        el.removeAttribute(LIST_MARKER);
+        el.removeAttribute(LTR_MARKER);
+      });
+  }
+
+  function applyVazirClass() {
+    document.documentElement.classList.toggle(VAZIR_CLASS, settings.vazirFont);
+  }
+
+  function enable() {
+    settings.enabled = true;
+    applyVazirClass();
+    startObserving();
+    processSubtree(document.body);
+  }
+
+  function disable() {
+    settings.enabled = false;
+    teardown();
+    document.documentElement.classList.remove(VAZIR_CLASS);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Live settings sync (popup <-> content script)
+  // ---------------------------------------------------------------------------
+
+  api.storage.onChanged?.addListener((changes, areaName) => {
+    if (areaName !== 'local') return;
+
+    if ('vazirFont' in changes) {
+      settings.vazirFont = changes.vazirFont.newValue === true;
+      if (settings.enabled) applyVazirClass();
+    }
+
+    if ('enabled' in changes) {
+      const nowEnabled = changes.enabled.newValue !== false;
+      if (nowEnabled && !settings.enabled) {
+        enable();
+      } else if (!nowEnabled && settings.enabled) {
+        disable();
       }
     }
   });
 
-  observer.observe(document.body, {
-    childList:     true,
-    subtree:       true,
-    characterData: true,
+  // Manual re-scan trigger from the popup (useful after toggling settings
+  // or if a paragraph was somehow missed by the observer).
+  api.runtime.onMessage?.addListener((message, _sender, sendResponse) => {
+    if (message && message.type === 'claude-rtl-fix:rescan') {
+      if (settings.enabled) processSubtree(document.body);
+      sendResponse?.({ ok: true });
+    }
   });
 
-  // Initial pass over whatever is already in the DOM.
-  processSubtree(document.body);
+  // ---------------------------------------------------------------------------
+  // Boot
+  // ---------------------------------------------------------------------------
+
+  storageGet(['enabled', 'vazirFont']).then((stored) => {
+    settings.enabled   = stored.enabled !== false;   // default true
+    settings.vazirFont = stored.vazirFont === true;  // default false
+
+    if (settings.enabled) {
+      applyVazirClass();
+      startObserving();
+      processSubtree(document.body);
+    }
+  });
 })();

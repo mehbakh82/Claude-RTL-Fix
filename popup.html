@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Claude RTL Fix</title>
+<link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header class="header">
+    <img src="icons/icon48.png" alt="" class="logo">
+    <div class="title-block">
+      <h1>Claude RTL Fix</h1>
+      <p class="subtitle">Persian RTL for Claude.ai</p>
+    </div>
+  </header>
+
+  <div class="status" id="status">
+    <span class="status-dot" id="statusDot"></span>
+    <span id="statusText">Checking current tab…</span>
+  </div>
+
+  <main class="controls">
+    <label class="row" for="enabledToggle">
+      <span class="row-text">
+        <span class="row-label">Enable RTL Fix</span>
+        <span class="row-sub">فعال‌سازی راست‌به‌چپ</span>
+      </span>
+      <span class="switch">
+        <input type="checkbox" id="enabledToggle">
+        <span class="slider"></span>
+      </span>
+    </label>
+
+    <label class="row" for="vazirToggle">
+      <span class="row-text">
+        <span class="row-label">Use Vazirmatn font</span>
+        <span class="row-sub">فونت وزیرمتن برای متن فارسی</span>
+      </span>
+      <span class="switch">
+        <input type="checkbox" id="vazirToggle">
+        <span class="slider"></span>
+      </span>
+    </label>
+
+    <button class="rescan-btn" id="rescanBtn" type="button">
+      <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+        <path fill="currentColor" d="M8 2a6 6 0 1 0 5.66 4H12.1A4.5 4.5 0 1 1 8 3.5V2zM8 0l3 3-3 3V0z"/>
+      </svg>
+      Re-scan this page
+    </button>
+    <p class="rescan-hint" id="rescanHint"></p>
+  </main>
+
+  <footer class="footer">
+    <span id="versionText"></span>
+    <a href="https://github.com/mehbakh82/Claude-RTL-Fix" target="_blank" rel="noopener">GitHub</a>
+  </footer>
+
+  <script src="popup.js"></script>
+</body>
+</html>
